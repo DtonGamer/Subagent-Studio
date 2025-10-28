@@ -1,0 +1,259 @@
+# Claude Code Subagent File Generator
+
+Build a web application that generates Claude Code subagent configuration files using AI.
+
+## Core Requirements
+
+### 1. User Interface
+Create a clean, modern form with the following fields:
+
+**Agent Information:**
+- Agent Name (auto-converts to lowercase-with-hyphens format)
+- Description (what the agent does and when it should be invoked)
+- System Prompt (large textarea for the agent's instructions)
+
+**Configuration Options:**
+- Model Selection (dropdown: sonnet, opus, haiku, inherit)
+- Tools Selection (multi-select or checkboxes):
+  - Read, Write, Edit
+  - Bash, Glob, Grep
+  - Browser, Computer
+  - ListDir, Delete, Move
+  - MCP (toggle to inherit all MCP tools)
+  - Option: "Inherit all tools" (leaves tools field empty)
+
+**Generation Mode:**
+- Toggle between "Manual Entry" and "AI-Generated"
+- When "AI-Generated" is selected, show a single textarea where users describe what they want
+- Add "Generate with AI" button
+
+### 2. AI Generation Feature (Using Gemini 2.5 Flash)
+
+**API Integration:**
+```javascript
+// Use Gemini 2.5 Flash API
+const GEMINI_API_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent';
+// User provides their API key in settings
+```
+
+**Generation Prompt Template:**
+When user clicks "Generate with AI", send this prompt to Gemini:
+
+```
+You are an expert at creating Claude Code subagent configurations. Based on the user's description, generate a complete subagent configuration.
+
+User's description: {USER_INPUT}
+
+Generate the following in JSON format:
+{
+  "name": "suggested-agent-name",
+  "description": "Clear description of when this subagent should be invoked (include 'proactively' or 'MUST BE USED' for automatic delegation)",
+  "systemPrompt": "Detailed system prompt with specific instructions, best practices, and workflow steps",
+  "tools": ["Read", "Write", "Bash"],  // Only essential tools, or empty array for all tools
+  "model": "sonnet"  // or "opus", "haiku", "inherit"
+}
+
+Guidelines:
+- Description should be action-oriented and specify when to use the agent
+- System prompt should include:
+  * Clear role definition
+  * Step-by-step workflow ("When invoked: 1. ... 2. ...")
+  * Best practices and guidelines
+  * Expected output format
+- Only include tools that are necessary for the agent's purpose
+- Choose appropriate model based on task complexity
+- Make the agent focused on a single responsibility
+
+Return ONLY the JSON object, no other text.
+```
+
+### 3. File Generation & Download
+
+**Generate Markdown File:**
+```markdown
+---
+name: {agent-name}
+description: {description}
+tools: {comma-separated-tools}  # Omit this line entirely if "inherit all" is selected
+model: {model-choice}  # Omit this line if default
+---
+
+{system-prompt-content}
+```
+
+**Download Options:**
+- Generate single file: `{agent-name}.md`
+- Show preview before download
+- Copy to clipboard option
+- Download as .zip for multiple agents (future feature)
+
+### 4. Template Library
+
+Include 3 pre-built examples users can load:
+
+**Code Reviewer Template:**
+```
+name: code-reviewer
+description: Expert code review specialist. Proactively reviews code for quality, security, and maintainability. Use immediately after writing or modifying code.
+tools: Read, Grep, Glob, Bash
+model: inherit
+```
+
+**Debugger Template:**
+```
+name: debugger
+description: Debugging specialist for errors, test failures, and unexpected behavior. Use proactively when encountering any issues.
+tools: Read, Edit, Bash, Grep, Glob
+```
+
+**Data Scientist Template:**
+```
+name: data-scientist
+description: Data analysis expert for SQL queries, BigQuery operations, and data insights. Use proactively for data analysis tasks and queries.
+tools: Bash, Read, Write
+model: sonnet
+```
+
+### 5. Features & UI Elements
+
+**Left Panel:**
+- Template library (clickable cards)
+- "New Agent" button
+- Recent agents list (stored in localStorage)
+
+**Main Panel:**
+- Form fields (shown above)
+- AI generation textarea (when in AI mode)
+- "Generate with AI" button
+- Preview section showing generated markdown
+
+**Right Panel:**
+- Live preview of the markdown file
+- Syntax highlighting
+- "Download" button
+- "Copy to Clipboard" button
+- Instructions on where to save the file
+
+**Settings Modal:**
+- Gemini API Key input
+- Default model preference
+- Save to localStorage
+
+### 6. Validation & Helpers
+
+**Validation Rules:**
+- Name: Only lowercase, numbers, and hyphens
+- Description: Required, min 20 characters
+- System Prompt: Required, min 50 characters
+- Show helpful tooltips and validation errors
+
+**Helper Features:**
+- Name formatter (auto-converts spaces to hyphens)
+- Character counter for description and prompt
+- Tool recommendations based on agent type
+- Example descriptions that trigger automatic delegation
+
+### 7. Technical Stack Suggestions
+
+**For Lovable.dev / Bolt.new:**
+- React with TypeScript
+- Tailwind CSS for styling
+- Lucide React for icons
+- React Hook Form for form management
+- Zustand or Context API for state
+- File-saver for downloads
+
+**State Management:**
+```javascript
+{
+  agentConfig: {
+    name: string,
+    description: string,
+    systemPrompt: string,
+    tools: string[],
+    model: string,
+    inheritAllTools: boolean
+  },
+  generationMode: 'manual' | 'ai',
+  geminiApiKey: string,
+  recentAgents: AgentConfig[]
+}
+```
+
+### 8. User Flow
+
+1. User opens app
+2. Chooses template OR clicks "New Agent" OR enters AI generation mode
+3. If AI mode: enters description → clicks "Generate" → AI fills form
+4. Reviews/edits configuration
+5. Sees live preview
+6. Downloads markdown file
+7. Instructions show: "Save to `.claude/agents/` (project) or `~/.claude/agents/` (global)"
+
+### 9. Advanced Features (Optional)
+
+- Batch generation (multiple agents at once)
+- Export/import agent collections
+- Validation against Claude Code schema
+- Integration with GitHub to push directly to repo
+- Agent testing simulator
+
+## Design Guidelines
+
+**Color Scheme:**
+- Primary: Claude's orange (#CC785C)
+- Accent: Purple/violet for AI features
+- Dark mode support
+
+**Layout:**
+- Clean, spacious design
+- Clear visual hierarchy
+- Responsive (works on mobile)
+- Accessibility: proper labels, keyboard navigation
+
+**Messaging:**
+- Clear instructions at each step
+- Helpful tooltips explaining each field
+- Success messages on generation
+- Error handling with friendly messages
+
+## Example API Call (Gemini 2.5 Flash)
+
+```javascript
+async function generateAgentWithAI(userDescription, apiKey) {
+  const prompt = `You are an expert at creating Claude Code subagent configurations...
+  User's description: ${userDescription}
+  [full prompt from above]`;
+  
+  const response = await fetch(
+    `${GEMINI_API_ENDPOINT}?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{ text: prompt }]
+        }]
+      })
+    }
+  );
+  
+  const data = await response.json();
+  const generatedText = data.candidates[0].content.parts[0].text;
+  const agentConfig = JSON.parse(generatedText);
+  
+  return agentConfig;
+}
+```
+
+## Success Criteria
+
+✅ Users can generate valid Claude Code subagent files
+✅ AI generation works reliably with Gemini 2.5 Flash
+✅ Files download in correct markdown format
+✅ UI is intuitive and easy to use
+✅ Templates provide good starting points
+✅ Validation prevents invalid configurations
+
+
+---
