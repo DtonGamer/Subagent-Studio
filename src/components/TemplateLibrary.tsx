@@ -1,4 +1,3 @@
-import React from 'react';
 import { FileText, Plus, Clock } from 'lucide-react';
 import { useStore } from '../store';
 import { templates } from '../templates';

@@ -1,4 +1,3 @@
-import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import TemplateLibrary from '../components/TemplateLibrary';
 import { useStore } from '../store';
