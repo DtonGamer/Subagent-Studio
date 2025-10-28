@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Settings, Moon, Sun, Library, PenTool, Eye } from 'lucide-react';
 import { useStore } from '../store';

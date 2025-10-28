@@ -1,5 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { AgentConfig, ApiProvider } from './types';
+import { 
+  generateIntelligentlyWithGemini, 
+  generateIntelligentlyWithClaude, 
+  generateIntelligentlyWithOpenRouter 
+} from './utils-intelligent';
 
 // Parse API errors into user-friendly messages
 export function parseApiError(error: any): string {
@@ -113,6 +118,22 @@ export async function generateWithAI(
     return generateWithOpenRouter(userDescription, apiKey, modelId);
   }
   return generateWithGemini(userDescription, apiKey, modelId);
+}
+
+// Intelligent batch generation - AI decides if one or multiple agents needed
+export async function generateAgentsIntelligently(
+  userDescription: string,
+  apiKey: string,
+  provider: ApiProvider = 'gemini',
+  modelId?: string
+): Promise<AgentConfig[]> {
+  if (provider === 'claude') {
+    return generateIntelligentlyWithClaude(userDescription, apiKey, modelId);
+  }
+  if (provider === 'openrouter') {
+    return generateIntelligentlyWithOpenRouter(userDescription, apiKey, modelId);
+  }
+  return generateIntelligentlyWithGemini(userDescription, apiKey, modelId);
 }
 
 async function generateWithGemini(

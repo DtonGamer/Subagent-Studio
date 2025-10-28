@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Sparkles, AlertCircle, List, CheckCircle, Loader } from 'lucide-react';
 import { useStore } from '../store';
 import { AVAILABLE_TOOLS, MODELS } from '../types';
-import { formatAgentName, generateWithAI, validateConfig, parseApiError } from '../utils';
+import { formatAgentName, generateWithAI, validateConfig, parseApiError, generateAgentsIntelligently } from '../utils';
 
 export default function AgentForm() {
   const {
@@ -21,7 +21,7 @@ export default function AgentForm() {
 
   const [aiDescription, setAiDescription] = useState('');
   const [errors, setErrors] = useState<string[]>([]);
-  const [batchMode, setBatchMode] = useState(false);
+  const [generationStrategy, setGenerationStrategy] = useState<'intelligent' | 'single' | 'manual-batch'>('intelligent');
   const [batchDescriptions, setBatchDescriptions] = useState('');
   const [batchProgress, setBatchProgress] = useState<{
     total: number;
@@ -60,12 +60,38 @@ export default function AgentForm() {
     setErrors([]);
 
     try {
-      const generated = await generateWithAI(aiDescription, apiKey, apiProvider, selectedAiModel);
-      setAgentConfig(generated);
-      setGenerationMode('manual');
+      if (generationStrategy === 'intelligent') {
+        // AI decides: one agent or multiple?
+        const generatedAgents = await generateAgentsIntelligently(aiDescription, apiKey, apiProvider, selectedAiModel);
+        
+        if (generatedAgents.length === 1) {
+          // Single agent - load it into the form
+          setAgentConfig(generatedAgents[0]);
+          setGenerationMode('manual');
+          setErrors([`✅ Created 1 agent: ${generatedAgents[0].name}`]);
+        } else {
+          // Multiple agents - show success message
+          setErrors([
+            `✅ Created ${generatedAgents.length} specialized agents:`,
+            ...generatedAgents.map(a => `  • ${a.name}`),
+            '',
+            'The first agent has been loaded. Save it, then create the others from the list above.'
+          ]);
+          setAgentConfig(generatedAgents[0]);
+          setGenerationMode('manual');
+          
+          // Store other agents for later (you could save to database here)
+          console.log('Generated agents:', generatedAgents);
+        }
+      } else if (generationStrategy === 'single') {
+        // Force single agent generation
+        const generated = await generateWithAI(aiDescription, apiKey, apiProvider, selectedAiModel);
+        setAgentConfig(generated);
+        setGenerationMode('manual');
+        setErrors([`✅ Created 1 agent: ${generated.name}`]);
+      }
       setAiDescription('');
     } catch (error) {
-      // Use the friendly error parser
       const friendlyError = parseApiError(error);
       setErrors([friendlyError]);
     } finally {
@@ -128,7 +154,7 @@ export default function AgentForm() {
         } : null);
       }
 
-      // Small delay between requests to avoid rate limiting
+      // Add delay between requests to avoid rate limiting
       if (i < descriptions.length - 1) {
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
@@ -138,20 +164,23 @@ export default function AgentForm() {
 
     // Show results
     if (generatedAgents.length > 0) {
-      // Load the first generated agent into the form
+      setErrors([
+        `✅ Successfully generated ${generatedAgents.length} / ${descriptions.length} agents`,
+        ...generatedAgents.map(a => `  • ${a.name}`),
+        '',
+        batchProgress?.failed.length ? '❌ Failed:' : '',
+        ...(batchProgress?.failed || []),
+      ].filter(Boolean));
+      
+      // Load first agent
       setAgentConfig(generatedAgents[0]);
       setGenerationMode('manual');
-      setBatchDescriptions('');
-      
-      // Show success message
-      const successMsg = `✅ Successfully generated ${generatedAgents.length} agent(s)!`;
-      const failedMsg = batchProgress?.failed.length ? `\n\n⚠️ Failed: ${batchProgress.failed.length}` : '';
-      setErrors([successMsg + failedMsg]);
+      console.log('All generated agents:', generatedAgents);
     } else {
-      setErrors(['❌ Failed to generate any agents. Please check your descriptions and try again.']);
+      setErrors(['❌ Failed to generate any agents. Please check your API key and try again.']);
     }
 
-    // Clear progress after 3 seconds
+    // Keep progress visible for 3 seconds
     setTimeout(() => setBatchProgress(null), 3000);
   };
 
@@ -161,16 +190,7 @@ export default function AgentForm() {
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-      <div className="mb-6">
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-          Agent Configuration
-        </h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          Create a custom subagent or use AI to generate one
-        </p>
-      </div>
-
+    <div className="space-y-6">
       {/* Generation Mode Toggle */}
       <div className="mb-6">
         <div className="flex space-x-2 bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
@@ -229,132 +249,174 @@ export default function AgentForm() {
       {/* AI Generation Mode */}
       {generationMode === 'ai' ? (
         <div className="space-y-4">
-          {/* Batch Mode Toggle */}
-          <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center space-x-2">
-              <List className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Batch Mode
-              </span>
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                (Generate multiple agents)
-              </span>
+          {/* Generation Strategy Selection */}
+          <div className="p-4 bg-gradient-to-br from-purple-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-gray-700/50 rounded-lg border border-purple-200 dark:border-purple-800">
+            <label className="block text-sm font-bold text-gray-900 dark:text-white mb-3 flex items-center">
+              <Sparkles className="w-4 h-4 mr-2 text-purple-600 dark:text-purple-400" />
+              How should AI generate agents?
+            </label>
+            <div className="space-y-2">
+              {/* Intelligent Mode */}
+              <label className={`flex items-start space-x-3 p-3 rounded-lg border-2 cursor-pointer transition-all hover:bg-white/50 dark:hover:bg-gray-700/50 ${
+                generationStrategy === 'intelligent'
+                  ? 'border-purple-500 bg-white dark:bg-gray-800 shadow-sm'
+                  : 'border-gray-200 dark:border-gray-600'
+              }`}>
+                <input
+                  type="radio"
+                  name="generation-strategy"
+                  value="intelligent"
+                  checked={generationStrategy === 'intelligent'}
+                  onChange={(e) => setGenerationStrategy(e.target.value as any)}
+                  className="mt-1 text-purple-600 focus:ring-purple-500"
+                />
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900 dark:text-white">🧠 Intelligent (Recommended)</div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                    AI analyzes your description and decides whether to create 1 comprehensive agent or multiple specialized agents
+                  </div>
+                </div>
+              </label>
+
+              {/* Single Agent Mode */}
+              <label className={`flex items-start space-x-3 p-3 rounded-lg border-2 cursor-pointer transition-all hover:bg-white/50 dark:hover:bg-gray-700/50 ${
+                generationStrategy === 'single'
+                  ? 'border-purple-500 bg-white dark:bg-gray-800 shadow-sm'
+                  : 'border-gray-200 dark:border-gray-600'
+              }`}>
+                <input
+                  type="radio"
+                  name="generation-strategy"
+                  value="single"
+                  checked={generationStrategy === 'single'}
+                  onChange={(e) => setGenerationStrategy(e.target.value as any)}
+                  className="mt-1 text-purple-600 focus:ring-purple-500"
+                />
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900 dark:text-white">📄 Single Agent</div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                    Always create just 1 comprehensive agent, regardless of complexity
+                  </div>
+                </div>
+              </label>
+
+              {/* Manual Batch Mode */}
+              <label className={`flex items-start space-x-3 p-3 rounded-lg border-2 cursor-pointer transition-all hover:bg-white/50 dark:hover:bg-gray-700/50 ${
+                generationStrategy === 'manual-batch'
+                  ? 'border-purple-500 bg-white dark:bg-gray-800 shadow-sm'
+                  : 'border-gray-200 dark:border-gray-600'
+              }`}>
+                <input
+                  type="radio"
+                  name="generation-strategy"
+                  value="manual-batch"
+                  checked={generationStrategy === 'manual-batch'}
+                  onChange={(e) => setGenerationStrategy(e.target.value as any)}
+                  className="mt-1 text-purple-600 focus:ring-purple-500"
+                />
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900 dark:text-white flex items-center">
+                    <List className="w-4 h-4 mr-1" />
+                    Multiple Agents (Manual List)
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                    Provide separate descriptions (one per line, max 10) - each becomes its own agent
+                  </div>
+                </div>
+              </label>
             </div>
-            <button
-              onClick={() => setBatchMode(!batchMode)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                batchMode ? 'bg-claude-orange' : 'bg-gray-300 dark:bg-gray-600'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  batchMode ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
           </div>
 
-          {/* Single Agent Mode */}
-          {!batchMode ? (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Describe your subagent
-                </label>
-                <textarea
-                  value={aiDescription}
-                  onChange={(e) => setAiDescription(e.target.value)}
-                  placeholder="E.g., I need a subagent that reviews Python code for security vulnerabilities and suggests improvements..."
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-claude-orange focus:border-transparent dark:bg-gray-700 dark:text-white resize-none"
-                  rows={6}
-                />
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  {aiDescription.length} characters
-                </p>
-              </div>
-              <button
-                onClick={handleGenerateWithAI}
-                disabled={isGenerating || !aiDescription.trim()}
-                className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-gradient-to-r from-claude-purple to-claude-orange text-white rounded-lg hover:opacity-90 transition-opacity font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Sparkles className="w-5 h-5" />
-                <span>{isGenerating ? 'Generating...' : 'Generate with AI'}</span>
-              </button>
-            </>
+          {/* Description Input - changes based on strategy */}
+          {generationStrategy === 'manual-batch' ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Agent Descriptions (one per line)
+              </label>
+              <textarea
+                value={batchDescriptions}
+                onChange={(e) => setBatchDescriptions(e.target.value)}
+                placeholder="Python code reviewer&#10;JavaScript debugger&#10;SQL query optimizer&#10;..."  
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-claude-orange focus:border-transparent dark:bg-gray-700 dark:text-white font-mono text-sm"
+                rows={8}
+                disabled={isGenerating}
+              />
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {batchDescriptions.split('\n').filter(d => d.trim()).length} / 10 agents
+              </p>
+            </div>
           ) : (
-            /* Batch Mode */
-            <>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Agent Descriptions (one per line, max 10)
-                </label>
-                <textarea
-                  value={batchDescriptions}
-                  onChange={(e) => setBatchDescriptions(e.target.value)}
-                  placeholder="Code reviewer for Python with security focus
-Debugger specialized in React applications
-Data scientist for SQL query optimization
-..."
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-claude-orange focus:border-transparent dark:bg-gray-700 dark:text-white resize-none font-mono text-sm"
-                  rows={8}
-                />
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  {batchDescriptions.split('\n').filter(d => d.trim()).length} agent(s) • Max 10
-                </p>
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Describe what you want the agent(s) to do
+              </label>
+              <textarea
+                value={aiDescription}
+                onChange={(e) => setAiDescription(e.target.value)}
+                placeholder={generationStrategy === 'intelligent' 
+                  ? "Describe your project or task in detail. AI will decide if you need 1 agent or multiple specialized agents...\n\nExample: 'Complete my RAG Book project with edge functions, worker stability, payment integration, and admin panel'" 
+                  : "Describe the agent you want to create...\n\nExample: 'A code reviewer that checks Python code for security issues and best practices'"
+                }
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-claude-orange focus:border-transparent dark:bg-gray-700 dark:text-white"
+                rows={8}
+                disabled={isGenerating}
+              />
+            </div>
+          )}
 
-              {/* Batch Progress */}
-              {batchProgress && (
-                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-blue-900 dark:text-blue-300">
-                      Generating agents...
-                    </span>
-                    <span className="text-sm text-blue-700 dark:text-blue-400">
-                      {batchProgress.current} / {batchProgress.total}
-                    </span>
-                  </div>
-                  <div className="w-full bg-blue-200 dark:bg-blue-900 rounded-full h-2 mb-2">
-                    <div
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
-                    />
-                  </div>
-                  {batchProgress.completed.length > 0 && (
-                    <div className="space-y-1">
-                      {batchProgress.completed.map((name, i) => (
-                        <div key={i} className="flex items-center space-x-2 text-xs text-green-700 dark:text-green-400">
-                          <CheckCircle className="w-3 h-3" />
-                          <span>{name}</span>
-                        </div>
-                      ))}
+          {/* Batch Progress */}
+          {batchProgress && generationStrategy === 'manual-batch' && (
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-blue-900 dark:text-blue-300">
+                  Generating agents...
+                </span>
+                <span className="text-sm text-blue-700 dark:text-blue-400">
+                  {batchProgress.current} / {batchProgress.total}
+                </span>
+              </div>
+              <div className="w-full bg-blue-200 dark:bg-blue-900 rounded-full h-2 mb-2">
+                <div
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
+                />
+              </div>
+              {batchProgress.completed.length > 0 && (
+                <div className="space-y-1">
+                  {batchProgress.completed.map((name, i) => (
+                    <div key={i} className="flex items-center space-x-2 text-xs text-green-700 dark:text-green-400">
+                      <CheckCircle className="w-3 h-3" />
+                      <span>{name}</span>
                     </div>
-                  )}
+                  ))}
                 </div>
               )}
-
-              <button
-                onClick={handleBatchGenerate}
-                disabled={isGenerating || !batchDescriptions.trim()}
-                className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-gradient-to-r from-claude-purple to-claude-orange text-white rounded-lg hover:opacity-90 transition-opacity font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isGenerating ? (
-                  <>
-                    <Loader className="w-5 h-5 animate-spin" />
-                    <span>Generating {batchProgress?.current || 0} of {batchProgress?.total || 0}...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-5 h-5" />
-                    <span>Generate All Agents</span>
-                  </>
-                )}
-              </button>
-            </>
+            </div>
           )}
+
+          {/* Generate Button */}
+          <button
+            onClick={generationStrategy === 'manual-batch' ? handleBatchGenerate : handleGenerateWithAI}
+            disabled={isGenerating || (generationStrategy === 'manual-batch' ? !batchDescriptions.trim() : !aiDescription.trim())}
+            className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-gradient-to-r from-claude-purple to-claude-orange text-white rounded-lg hover:opacity-90 transition-opacity font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isGenerating ? (
+              <>
+                <Loader className="w-5 h-5 animate-spin" />
+                <span>Generating...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-5 h-5" />
+                <span>
+                  {generationStrategy === 'manual-batch' ? 'Generate All Agents' : 'Generate with AI'}
+                </span>
+              </>
+            )}
+          </button>
         </div>
       ) : (
-        /* Manual Entry Mode */
+        /* Manual Mode */
         <div className="space-y-4">
           {/* Agent Name */}
           <div>
@@ -365,7 +427,7 @@ Data scientist for SQL query optimization
               type="text"
               value={agentConfig.name}
               onChange={(e) => handleNameChange(e.target.value)}
-              placeholder="my-agent-name"
+              placeholder="my-agent"
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-claude-orange focus:border-transparent dark:bg-gray-700 dark:text-white"
             />
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -381,7 +443,7 @@ Data scientist for SQL query optimization
             <textarea
               value={agentConfig.description}
               onChange={(e) => setAgentConfig({ description: e.target.value })}
-              placeholder="Clear description of when this subagent should be invoked..."
+              placeholder="When should this agent be invoked?"
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-claude-orange focus:border-transparent dark:bg-gray-700 dark:text-white resize-none"
               rows={3}
             />
@@ -425,33 +487,31 @@ Data scientist for SQL query optimization
             </select>
           </div>
 
-          {/* Tools Selection */}
+          {/* Tools */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Tools
-            </label>
-            <div className="mb-2">
-              <label className="flex items-center space-x-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={agentConfig.inheritAllTools}
-                  onChange={(e) => setAgentConfig({ inheritAllTools: e.target.checked, tools: [] })}
-                  className="rounded border-gray-300 text-claude-orange focus:ring-claude-orange"
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">
-                  Inherit all tools (recommended)
-                </span>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Tools
               </label>
+              <button
+                onClick={() => setAgentConfig({ inheritAllTools: !agentConfig.inheritAllTools })}
+                className="text-xs text-claude-orange hover:underline"
+              >
+                {agentConfig.inheritAllTools ? 'Select specific tools' : 'Inherit all tools'}
+              </button>
             </div>
             {!agentConfig.inheritAllTools && (
               <div className="grid grid-cols-2 gap-2">
                 {AVAILABLE_TOOLS.map((tool) => (
-                  <label key={tool} className="flex items-center space-x-2 cursor-pointer">
+                  <label
+                    key={tool}
+                    className="flex items-center space-x-2 p-2 rounded border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+                  >
                     <input
                       type="checkbox"
                       checked={agentConfig.tools.includes(tool)}
                       onChange={() => handleToolToggle(tool)}
-                      className="rounded border-gray-300 text-claude-orange focus:ring-claude-orange"
+                      className="rounded text-claude-orange focus:ring-claude-orange"
                     />
                     <span className="text-sm text-gray-700 dark:text-gray-300">{tool}</span>
                   </label>
@@ -463,7 +523,7 @@ Data scientist for SQL query optimization
           {/* Validate Button */}
           <button
             onClick={handleValidate}
-            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium"
+            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
           >
             Validate Configuration
           </button>
