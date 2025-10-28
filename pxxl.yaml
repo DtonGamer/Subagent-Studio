@@ -1,0 +1,41 @@
+# Pxxl Configuration for Subagent Studio
+# This file helps Pxxl understand how to build and deploy your app
+
+# Build configuration
+build_command: "npm run build"
+output_directory: "dist"
+
+# Environment variables that need to be set
+required_env_vars:
+  - VITE_SUPABASE_URL
+  - VITE_SUPABASE_ANON_KEY
+
+# Optional environment variables (for future features)
+optional_env_vars:
+  - VITE_APP_NAME
+  - VITE_APP_VERSION
+
+# Node.js version
+node_version: "18"
+
+# Install command - use standard npm install
+install_command: "npm install"
+
+# SPA routing - redirect all routes to index.html
+redirects:
+  - from: "/*"
+    to: "/index.html"
+    status: 200
+
+# Headers for security
+headers:
+  - path: "/*"
+    headers:
+      - key: "X-Frame-Options"
+        value: "DENY"
+      - key: "X-Content-Type-Options"
+        value: "nosniff"
+      - key: "Referrer-Policy"
+        value: "strict-origin-when-cross-origin"
+      - key: "Permissions-Policy"
+        value: "camera=(), microphone=(), geolocation=()"

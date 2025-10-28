@@ -7,6 +7,9 @@ A modern, full-featured web application for creating, managing, and organizing C
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
 ![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-green)
 
+[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/DtonGamer/Subagent-Studio)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/DtonGamer/Subagent-Studio)
+
 ## ✨ Features
 
 ### 🤖 AI-Powered Generation
@@ -208,8 +211,10 @@ npm run preview
 ## 📖 Documentation
 
 - **[GitHub Auth Setup](GITHUB_AUTH_SETUP.md)** - Complete guide for setting up GitHub OAuth
+- **[Deployment Guide](DEPLOYMENT.md)** - Deploy to Netlify, Vercel, Pxxl, or GitHub Pages
 - **[Supabase Schema](supabase-schema.sql)** - Database schema with RLS policies
 - **[Setup Guide](SETUP.md)** - Detailed setup instructions
+- **[Contributing](CONTRIBUTING.md)** - How to contribute to the project
 
 ## 🤝 Contributing
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Key, Save, Sparkles } from 'lucide-react';
+import { X, Key, Save, Sparkles, Zap, Brain, Network } from 'lucide-react';
 import { useStore } from '../store';
 import { AI_MODELS } from '../types';
 
@@ -68,40 +68,47 @@ export default function SettingsModal() {
         {/* Content */}
         <div className="space-y-4">
           {/* API Provider Selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              AI Provider
+          <div className="border-2 border-claude-orange/20 dark:border-claude-orange/30 rounded-lg p-4 bg-gradient-to-br from-orange-50/50 to-purple-50/50 dark:from-gray-800/50 dark:to-gray-700/50">
+            <label className="block text-base font-bold text-gray-900 dark:text-white mb-3 flex items-center">
+              <Zap className="w-5 h-5 mr-2 text-claude-orange" />
+              Choose Your AI Provider
             </label>
+            <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+              Select which AI service to use for generating agents
+            </p>
             <div className="grid grid-cols-3 gap-2 bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
               <button
                 onClick={() => handleProviderChange('gemini')}
-                className={`py-2 px-3 rounded-md text-sm font-medium transition-colors ${
+                className={`py-3 px-3 rounded-md text-sm font-medium transition-all flex flex-col items-center gap-1 ${
                   provider === 'gemini'
-                    ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                    ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-md ring-2 ring-claude-orange'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-600'
                 }`}
               >
-                Gemini
+                <Brain className="w-5 h-5" />
+                <span>Gemini</span>
               </button>
               <button
                 onClick={() => handleProviderChange('claude')}
-                className={`py-2 px-3 rounded-md text-sm font-medium transition-colors ${
+                className={`py-3 px-3 rounded-md text-sm font-medium transition-all flex flex-col items-center gap-1 ${
                   provider === 'claude'
-                    ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                    ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-md ring-2 ring-claude-orange'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-600'
                 }`}
               >
-                Claude
+                <Sparkles className="w-5 h-5" />
+                <span>Claude</span>
               </button>
               <button
                 onClick={() => handleProviderChange('openrouter')}
-                className={`py-2 px-3 rounded-md text-sm font-medium transition-colors ${
+                className={`py-3 px-3 rounded-md text-sm font-medium transition-all flex flex-col items-center gap-1 ${
                   provider === 'openrouter'
-                    ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                    ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-md ring-2 ring-claude-orange'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-600'
                 }`}
               >
-                OpenRouter
+                <Network className="w-5 h-5" />
+                <span>OpenRouter</span>
               </button>
             </div>
           </div>

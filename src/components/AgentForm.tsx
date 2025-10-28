@@ -74,8 +74,8 @@ export default function AgentForm() {
   };
 
   const handleBatchGenerate = async () => {
-    const apiKey = apiProvider === 'gemini' ? geminiApiKey : claudeApiKey;
-    const providerName = apiProvider === 'gemini' ? 'Gemini' : 'Claude';
+    const apiKey = apiProvider === 'gemini' ? geminiApiKey : apiProvider === 'claude' ? claudeApiKey : openRouterApiKey;
+    const providerName = apiProvider === 'gemini' ? 'Gemini' : apiProvider === 'claude' ? 'Claude' : 'OpenRouter';
     
     if (!apiKey) {
       setErrors([`Please set your ${providerName} API key in settings`]);
